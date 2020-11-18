@@ -7,106 +7,106 @@
 import os, sys
 import re
 import struct
+import socket
+from . import GE_SRTP_Messages
 
 
 
 class GeSrtp:
 
 
-    #Public Functions
-    def __init__(self):
-
+    def __init__(self, ip):
         self.PLC_PORT = 18245
+        self.plc_ip = ip
+        self.plc_sock=socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        if not ip:
+            raise Exception("No IP passed to constructor.")
 
-        # Exploit paper does not show it, but first send 56 bytes of
-        # all 0s to the PLC before real message. It will respond with
-        # 01 00 ......
-        self.INIT_MSG = bytearray(56)
 
-        # Example Transmit message.
-        # This is standard message format, you need to
-        # update some fields before sending.
-        self.BASE_MSG = [
-            b'\x02',        # 00 - Type (03 is Return, 02 is Transmit)
-            b'\x00',        # 01 - Reserved/Unknown
-            b'\x06',        # 02 - Seq Number - FILL AT RUNTIME
-            b'\x00',        # 03 - Reserved/Unknown
-            b'\x00',        # 04 - Text Length - FILL AT RUNTIME ???
-            b'\x00',        # 05 - Reserved/Unknown
-            b'\x00',        # 06 - Reserved/Unknown
-            b'\x00',        # 07 - Reserved/Unknown
-            b'\x00',        # 08 - Reserved/Unknown
-            b'\x01',        # 09 - Reserved/Unknown*
-            b'\x00',        # 10 - Reserved/Unknown
-            b'\x00',        # 11 - Reserved/Unknown
-            b'\x00',        # 12 - Reserved/Unknown
-            b'\x00',        # 13 - Reserved/Unknown
-            b'\x00',        # 14 - Reserved/Unknown
-            b'\x00',        # 15 - Reserved/Unknown
-            b'\x00',        # 16 - Reserved/Unknown
-            b'\x01',        # 17 - Reserved/Unknown*
-            b'\x00',        # 18 - Reserved/Unknown
-            b'\x00',        # 19 - Reserved/Unknown
-            b'\x00',        # 20 - Reserved/Unknown
-            b'\x00',        # 21 - Reserved/Unknown
-            b'\x00',        # 22 - Reserved/Unknown
-            b'\x00',        # 23 - Reserved/Unknown
-            b'\x00',        # 24 - Reserved/Unknown
-            b'\x00',        # 25 - Reserved/Unknown
-            b'\x00',        # 26 - Time Seconds - FILL AT RUNTIME
-            b'\x00',        # 27 - Time Minutes - FILL AT RUNTIME
-            b'\x00',        # 28 - Time Hours   - FILL AT RUNTIME
-            b'\x00',        # 29 - Reserved/Unknown
-            b'\x06',        # 30 - Seq Number (Repeated) - FILL AT RUNTIME ???? 0x06 always?
-            b'\xc0',        # 31 - Message Type
-            b'\x00',        # 32 - Mailbox Source
-            b'\x00',        # 33 - Mailbox Source
-            b'\x00',        # 34 - Mailbox Source
-            b'\x00',        # 35 - Mailbox Source
-            b'\x10',        # 36 - Mailbox Destination
-            b'\x0e',        # 37 - Mailbox Destination
-            b'\x00',        # 38 - Mailbox Destination
-            b'\x00',        # 39 - Mailbox Destination
-            b'\x01',        # 40 - Packet Number
-            b'\x01',        # 41 - Total Packet Number
-            b'\x00',        # 42 - Service Request Code - (Operation Type SERVICE_REQUEST_CODE)
-            b'\x00',        # 43 - Request Dependent Space (For Reading: set MEMORY_TYPE_CODE)
-            b'\x00',        # 44 - Request Dependent Space (For Reading: set to Address - 1)(LSB)
-            b'\x00',        # 45 - Request Dependent Space (For Reading: set to Address - 1)(MSB)
-            b'\x00',        # 46 - Request Dependent Space (For Reading: Data Size Bytes)(LSB)
-            b'\x00',        # 47 - Request Dependent Space (For Reading: Data Size Bytes)(MSB)
-            b'\x00',        # 48 - Reserved/Unknown
-            b'\x00',        # 49 - Reserved/Unknown
-            b'\x00',        # 50 - Reserved/Unknown
-            b'\x00',        # 51 - Reserved/Unknown
-            b'\x00',        # 52 - Reserved/Unknown
-            b'\x00',        # 53 - Reserved/Unknown
-            b'\x00',        # 54 - Reserved/Unknown
-            b'\x00'         # 55 - Reserved/Unknown
-        ]
+    def __del__(self):
+        try:
+            self.plc_sock.close()
+        except:
+            pass
 
-        # Used at byte locaiton 42
-        self.SERVICE_REQUEST_CODE = {
-            "PLC_STATUS"             : b'\x00',
-            "RETURN_PROG_NAME"       : b'\x03',
-            "READ_SYS_MEMORY"        : b'\x04',    # Used to read general memory register (Example: %R12344)
-            "READ_TASK_MEMORY"       : b'\x05',
-            "READ_PROG_MEMORY"       : b'\x06',
-            "WRITE_SYS_MEMORY"       : b'\x07',
-            "WRITE_TASK_MEMORY"      : b'\x08',
-            "WRITE_PROG_MEMORY"      : b'\x09',
-            "RETURN_DATETIME"        : b'\x25',
-            "RETURN_CONTROLLER_TYPE" : b'\x43'
-        }
+    ###########################################################
+    # Creates inital socket connection,
+    # Sends 56 Byte init string to PLC.
+    # Returns 0 on ok, else error number.
+    ###########################################################
+    def initConnection(self):
+        try:
+            print("Connecting to {} on {}... ".format(self.plc_ip, self.PLC_PORT), end='')
+            self.plc_sock.connect((self.plc_ip, self.PLC_PORT))
+            print("Connected!")
 
-        # Used at byte locaiton 43
-        self.MEMORY_TYPE_CODE = {
-            "R"  :   b'\x08',    # Register (Word)
-            "AI" :   b'\x0a',    # Analog Input (Word)
-            "AQ" :   b'\x0c',    # Analog Output (Word)
-            "I"  :   b'\x10',    # Descrete Input (Byte)
-            "Q"  :   b'\x12',    # Descrete Output (Byte)
-        }
+            # Send 56 byte start package.
+            print("Sending INIT_MSG to PLC... ", end='')
+            self.plc_sock.send(GE_SRTP_Messages.INIT_MSG)
+            self.plc_sock.settimeout(2)
+            response = self.plc_sock.recv(1024)
+            print("OK!")
+            self.printLimitedBin("Response sample from INIT_MSG:",response, end=0)
+
+            # Verify success. (First byte of message is 0x01).
+            if response[0] == 1:
+                print("Valid Response, Init is good!")
+            else:
+                print("Failed Init Response check. Expected 0x01, got " + str(response[0]))
+
+            print("")
+            return(0)
+        except Exception as err:
+            print("\nError making connection to PLC.")
+            print("Exception:" + str(err))
+            self.plc_sock.close()
+            return(1)
+
+
+    def closeConnection(self):
+        try:
+            self.plc_sock.close()
+        except Exception as err:
+            print("Exception:" + str(err))
+
+
+
+    ###########################################################
+    # Sends command plc
+    # Must first init lib and have open socket.
+    # Returns 0 on ok, else error number.
+    ###########################################################
+    def sendSocketCommand(self, msg):
+
+        try:
+            if not type(msg) == bytes:
+                msg = msg.encode()
+                print("Warning, msg type not bytes, trying encode... This is a code issue?")
+            print("Sending socket command to PLC... ", end='')
+            self.plc_sock.send(msg)
+            self.plc_sock.settimeout(2)
+            response = self.plc_sock.recv(1024)
+            print("Response Received!")
+            #print("PLC Response: 0x" + ' 0x'.join(format(x, '02x') for x in response))
+            self.printLimitedBin("PLC Response:", response)
+            self.plc_sock.close()
+
+            self.fastDecodeResponseMessage(response)
+
+            return(0)
+        except Exception as err:
+            print("Exception:" + str(err))
+            self.plc_sock.close()
+            return(2)
+
+        return(3)
+
+
+
+
+
+
+
 
 
     ###########################################################
@@ -120,23 +120,30 @@ class GeSrtp:
 
         try:
             # Make copy of generic base message
-            tmp = self.BASE_MSG.copy()
-            tmp[42] = self.SERVICE_REQUEST_CODE["READ_SYS_MEMORY"]
+            tmp = GE_SRTP_Messages.BASE_MSG.copy()
+            tmp[42] = GE_SRTP_Messages.SERVICE_REQUEST_CODE["READ_SYS_MEMORY"]
             # Update for type of register
-            tmp[43] = self.MEMORY_TYPE_CODE[re.search('(R|AI|AQ|I|Q)',reg)[0]]
+            tmp[43] = GE_SRTP_Messages.MEMORY_TYPE_CODE[re.search('(R|AI|AQ|I|Q)',reg)[0]]
             # 0 based register to read
             address = int(re.search('\d+',reg)[0]) - 1
             tmp[44] = int(address & 255).to_bytes(1,byteorder='big')        # Get LSB of Word
             tmp[45] = int(address >> 8 ).to_bytes(1,byteorder='big')        # Get MSB of Word
             # Update for width
             tmp[46] = b'\x01'               # DANGER - TODO make dynamic for different data types.
-            arr = tmp
+            #arr = tmp
             #print('Array finalized, len:{}'.format( len(arr)))
-            self.printArrDebug(arr)
-            return(arr)
+            #self.printArrDebug(arr)
+            #return(arr)
+            bytes_to_send = b''.join(tmp)
+            self.sendSocketCommand(bytes_to_send)
         except Exception as err:
             print(err)
             return(None)
+
+
+
+
+            
 
 
     ###########################################################
@@ -177,3 +184,20 @@ class GeSrtp:
         for idx,b in enumerate(arr):
             if idx not in range(6,24):
                 print("{:02d}=>0x{:s}".format(idx, b.hex()) )
+    
+
+    ###########################################################
+    # Prints sample of binary data.
+    ###########################################################
+    def printLimitedBin(self, pre_msg, msg, start=7, end=7):
+        hex_resp_start = ""
+        hex_resp_end = ""
+        iter_len = sum(1 for _ in enumerate(msg))
+        for idx,x in enumerate(msg):
+            hex_resp_start += " {:02x}".format(x)
+            if idx > start: break
+        for idx,x in enumerate(msg):
+            if iter_len - idx <= end:
+                hex_resp_end += " {:02x}".format(x)
+            
+        print("{}{}...{} (Only Displaying {} of {} bytes)".format(pre_msg, hex_resp_start, hex_resp_end, start + end, len(msg)))

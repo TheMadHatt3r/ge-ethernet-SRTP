@@ -16,11 +16,34 @@ To date this is basically a proof of concept system. Using this code base, combi
 
 ## Functions: ##
  - Ability to read registers.
- - Ability to write registers.
+ - Ability to write registers. (Not yet implemented)
 
 ## Testing Performed: ##
 Tested on GE 90/30 and 90/70 Systems with reading of R type registers.
 
 ## Requirments: ##
 - Python 3.6+ (Regex is the limiting factor for 3.6, with some minor tweaks, you could run earlier 3.x)
+
+## Using the Library: ##
+I tried to keep things easy, there are 3 classes, only one of which you need to use as the programmer. example.py has everythign you need to get started bug a brief summary is below:
+
+**GeSrtp** -
+This Class contains the main libary code for reading / writing from the PLC.
+
+**GeSrtpResponse** -
+This Class is a structure to hold the response from the PLC, currently we are only interested in the register data, but the PLC does return other information, that could be added here for debugging etc. There are 2 status registers included today, although there usefulness is questionable.
+
+**GE_SRTP_Messages** -
+This Module contains multiple default message headers in byte array format.
+Typically to talk to the PLC, start with one of these and modify the bytes as needed.
+
+
+    from lib.GE_SRTP import GeSrtp
+
+    #Example to read a single Word register from GE PLC:
+    plc = GeSrtp(args.plc_ip) 
+    plc.initConnection()
+    result = plc.readSysMemory(args.reg)
+    print("The Result from PLC = {}".format(result.register_result))
+    plc.closeConnection()
 

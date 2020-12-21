@@ -23,9 +23,12 @@ def main():
         plc.initConnection()
 
         result = plc.readSysMemory(args.reg)
+        print("The Result from PLC = {}".format(result.register_result))
+        print("PLC Status Codes (42,43): 0x{:02x} 0x{:02x}".format(
+            result.status_code, result.status_code_minor))
 
         plc.closeConnection()
-        print("Done, Exiting...")
+        print("Demo Over...")
 
     except Exception as err:
         print("High level system exception.")

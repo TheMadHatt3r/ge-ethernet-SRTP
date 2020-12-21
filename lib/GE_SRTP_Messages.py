@@ -12,6 +12,7 @@
 # 01 00 ......
 INIT_MSG = bytearray(56)
 
+
 # Example Transmit message.
 # This is standard message format, you need to
 # update some fields before sending.
@@ -74,6 +75,7 @@ BASE_MSG = [
     b'\x00'         # 55 - Reserved/Unknown
 ]
 
+
 # Used at byte locaiton 42
 SERVICE_REQUEST_CODE = {
     "PLC_STATUS"             : b'\x00',
@@ -87,6 +89,7 @@ SERVICE_REQUEST_CODE = {
     "RETURN_DATETIME"        : b'\x25',
     "RETURN_CONTROLLER_TYPE" : b'\x43'
 }
+
 
 # Used at byte locaiton 43
 MEMORY_TYPE_CODE = {

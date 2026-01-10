@@ -4,6 +4,7 @@
 # The contained variables are referenced by GE_SRTP.py
 #
 # Author: Collin Matthews - 2020
+#         Dilpreet Chana - 2024
 ###########################################################
 
 
@@ -97,6 +98,10 @@ MEMORY_TYPE_CODE = {
     "AI" :   b'\x0a',    # Analog Input (Word)
     "AQ" :   b'\x0c',    # Analog Output (Word)
     "I"  :   b'\x10',    # Descrete Input (Byte)
-    "Q"  :   b'\x12',    # Descrete Output (Byte)
+    "Q"  :   b'\x48',    # Descrete Output (Bit)
+    "QB" :   b'\x12',    # Descrete Output (Byte)
+    "M"  :   b'\x4c',    # Descrete Internals (Bit)
+    "MB" :   b'\x16',    # Descrete Internals (Byte)
+    "G"  :   b'\x56',    # Descrete Internals (Bit)
+    "GB" :   b'\x38',    # Descrete Internals (Byte)
 }
-
